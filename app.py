@@ -3,6 +3,7 @@ import io
 import math
 import logging
 import uuid
+import threading
 from flask import Flask, request, abort, send_file
 from linebot.v3.messaging import (
     Configuration,
@@ -109,21 +110,30 @@ def image_to_bytes(img: Image.Image, fmt: str = "JPEG") -> bytes:
     return buf.getvalue()
 
 
+def delete_file_async(filepath, delay=30.0):
+    """Wait for a few seconds, then asynchronously delete the file."""
+    def _delete():
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                logger.info(f"Asynchronously deleted {filepath} after delay.")
+        except Exception as e:
+            logger.error(f"Failed to async delete {filepath}: {e}")
+            
+    t = threading.Timer(delay, _delete)
+    t.daemon = True
+    t.start()
+
 @app.route("/images/<filename>")
 def serve_image(filename):
     filepath = os.path.join(IMAGE_DIR, filename)
     if not os.path.exists(filepath):
         abort(404)
         
-    with open(filepath, "rb") as f:
-        data = f.read()
+    # Schedule deletion to happen asynchronously after a brief delay
+    delete_file_async(filepath, delay=30.0)
         
-    try:
-        os.remove(filepath)
-    except Exception as e:
-        logger.error(f"Failed to remove image {filepath}: {e}")
-        
-    return send_file(io.BytesIO(data), mimetype="image/jpeg", download_name=filename)
+    return send_file(filepath, mimetype="image/jpeg", download_name=filename)
 
 
 # ── webhook ───────────────────────────────────────────────────────────────────
