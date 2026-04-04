@@ -2,7 +2,8 @@ import os
 import io
 import math
 import logging
-from flask import Flask, request, abort
+import uuid
+from flask import Flask, request, abort, send_file
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -22,7 +23,6 @@ from linebot.v3.webhooks import (
 from PIL import Image
 import pytesseract
 from pytesseract import Output
-import requests
 
 # For Windows, point pytesseract to the tesseract executable if it's not in PATH
 if os.name == 'nt':
@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 # ── Flask & Line SDK ──────────────────────────────────────────────────────────
 app = Flask(__name__)
+
+IMAGE_DIR = "/tmp/images"
+os.makedirs(IMAGE_DIR, exist_ok=True)
 
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 LINE_CHANNEL_SECRET       = os.environ["LINE_CHANNEL_SECRET"]
@@ -106,39 +109,21 @@ def image_to_bytes(img: Image.Image, fmt: str = "JPEG") -> bytes:
     return buf.getvalue()
 
 
-def upload_image_to_imgbb(image_bytes: bytes) -> str:
-    """
-    Upload image to imgbb (free, no auth needed for small files) and return
-    the public URL.  Replace this with your own storage (S3, GCS, etc.)
-    if you prefer.
-
-    ⚠️  Set IMGBB_API_KEY in your environment variables.
-        Get a free key at https://api.imgbb.com/
-    """
-    api_key = os.environ.get("IMGBB_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("IMGBB_API_KEY is not set.")
-
-    import base64
-    b64 = base64.b64encode(image_bytes).decode()
-    resp = requests.post(
-        "https://api.imgbb.com/1/upload",
-        # Note: 60s is the minimum expiration allowed by ImgBB API
-        data={"key": api_key, "image": b64, "expiration": 60},
-        timeout=30,
-    )
-    
-    if resp.status_code == 400:
-        logger.error(f"ImgBB upload failed with expiration: {resp.text}")
-        logger.info("Retrying upload without the expiration parameter...")
-        resp = requests.post(
-            "https://api.imgbb.com/1/upload",
-            data={"key": api_key, "image": b64},
-            timeout=30,
-        )
+@app.route("/images/<filename>")
+def serve_image(filename):
+    filepath = os.path.join(IMAGE_DIR, filename)
+    if not os.path.exists(filepath):
+        abort(404)
         
-    resp.raise_for_status()
-    return resp.json()["data"]["url"]
+    with open(filepath, "rb") as f:
+        data = f.read()
+        
+    try:
+        os.remove(filepath)
+    except Exception as e:
+        logger.error(f"Failed to remove image {filepath}: {e}")
+        
+    return send_file(io.BytesIO(data), mimetype="image/jpeg", download_name=filename)
 
 
 # ── webhook ───────────────────────────────────────────────────────────────────
@@ -199,9 +184,15 @@ def handle_image(event: MessageEvent):
     rotated       = rotate_image(img, degrees)
     rotated_bytes = image_to_bytes(rotated)
 
-    # Upload to a public host so Line can fetch it
-    public_url = upload_image_to_imgbb(rotated_bytes)
-    logger.info(f"Uploaded rotated image → {public_url}")
+    # Save to disk temporarily so our endpoint can serve it
+    filename = uuid.uuid4().hex + ".jpg"
+    filepath = os.path.join(IMAGE_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(rotated_bytes)
+
+    host_url = request.url_root.replace("http://", "https://")
+    public_url = f"{host_url}images/{filename}"
+    logger.info(f"Hosting rotated image temporarily at → {public_url}")
 
     line_bot_api.reply_message(
         ReplyMessageRequest(
