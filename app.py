@@ -127,6 +127,16 @@ def upload_image_to_imgbb(image_bytes: bytes) -> str:
         data={"key": api_key, "image": b64, "expiration": 60},
         timeout=30,
     )
+    
+    if resp.status_code == 400:
+        logger.error(f"ImgBB upload failed with expiration: {resp.text}")
+        logger.info("Retrying upload without the expiration parameter...")
+        resp = requests.post(
+            "https://api.imgbb.com/1/upload",
+            data={"key": api_key, "image": b64},
+            timeout=30,
+        )
+        
     resp.raise_for_status()
     return resp.json()["data"]["url"]
 
