@@ -1,34 +1,37 @@
-# Line 照片自動旋轉機器人
+# Line Photo Auto-Rotate Bot
 
-收到照片時，若文字方向與照片方向不符，自動旋轉後回傳。
+[English](README.md) | [繁體中文](README_zh.md)
+
+When an image is received, if the text direction does not match the image orientation, it automatically rotates the image and sends it back.
 
 ---
 
-## 專案結構
+## Project Structure
 
 ```
 line-bot/
-├── app.py            # 主程式
-├── requirements.txt  # Python 套件
-├── Dockerfile        # Docker 部署設定
-├── render.yaml       # Render 部署設定
-└── README.md
+├── app.py            # Main application
+├── requirements.txt  # Python packages
+├── Dockerfile        # Docker deployment config
+├── render.yaml       # Render deployment config
+├── README.md         # English Documentation
+└── README_zh.md      # Chinese Documentation
 ```
 
 ---
 
-## 環境變數（必填）
+## Environment Variables (Required)
 
-| 變數名稱                    | 說明                | 取得方式                |
-| --------------------------- | ------------------- | ----------------------- |
-| `LINE_CHANNEL_ACCESS_TOKEN` | Line Bot Token      | Line Developers Console |
-| `LINE_CHANNEL_SECRET`       | Line Channel Secret | Line Developers Console |
+| Variable Name                 | Description                   | Where to Get It               |
+| ----------------------------- | ----------------------------- | ----------------------------- |
+| `LINE_CHANNEL_ACCESS_TOKEN`   | Line Bot Token                | Line Developers Console       |
+| `LINE_CHANNEL_SECRET`         | Line Channel Secret           | Line Developers Console       |
 
 ---
 
-## 本機測試步驟
+## Local Testing Steps
 
-### 1. 安裝 Tesseract OCR
+### 1. Install Tesseract OCR
 
 **macOS**
 
@@ -43,9 +46,9 @@ sudo apt-get install -y tesseract-ocr tesseract-ocr-chi-tra tesseract-ocr-chi-si
 ```
 
 **Windows**
-下載安裝包：https://github.com/UB-Mannheim/tesseract/wiki
+Download the installer: https://github.com/UB-Mannheim/tesseract/wiki
 
-### 2. 安裝 uv（若尚未安裝）
+### 2. Install uv (if not already installed)
 
 **macOS / Linux**
 
@@ -59,81 +62,81 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 3. 建立虛擬環境並安裝套件
+### 3. Create a Virtual Environment and Install Dependencies
 
 ```bash
-uv venv                        # 建立 .venv 虛擬環境
+uv venv                        # Create a .venv virtual environment
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
 uv pip install -r requirements.txt
 ```
 
-### 4. 設定環境變數
+### 4. Set Environment Variables
 
 ```bash
-export LINE_CHANNEL_ACCESS_TOKEN="你的Token"
-export LINE_CHANNEL_SECRET="你的Secret"
+export LINE_CHANNEL_ACCESS_TOKEN="YourToken"
+export LINE_CHANNEL_SECRET="YourSecret"
 ```
 
-### 5. 啟動伺服器
+### 5. Start the Server
 
 ```bash
 python app.py
 ```
 
-### 6. 用 ngrok 開啟公開網址（測試用）
+### 6. Expose the Local Server using ngrok (For Testing)
 
 ```bash
 ngrok http 5000
 ```
 
-把 `https://xxxx.ngrok.io/webhook` 填入 Line Developers Console 的 Webhook URL。
+Paste `https://xxxx.ngrok.io/webhook` into the Webhook URL in the Line Developers Console.
 
 ---
 
-## 部署到 Render（免費）
+## Deploy to Render (Free)
 
-1. 把這個資料夾推上 GitHub
-2. 在 [Render](https://render.com/) 建立 **New Web Service**，連結 GitHub repo
-3. Render 會自動讀取 `render.yaml` 建立 Docker 容器（自動安裝 Tesseract OCR 等依賴）
-4. 在 Render Dashboard → Environment 填入兩個 LINE 環境變數
-5. 部署完成後，把 `https://your-app.onrender.com/webhook` 填入 Line Developers Console
+1. Push this folder to GitHub.
+2. Create a **New Web Service** on [Render](https://render.com/) and connect your GitHub repo.
+3. Render will automatically read `render.yaml` and build a Docker container (which automatically installs Tesseract OCR and dependencies).
+4. Fill in the two LINE environment variables in Render Dashboard → Environment.
+5. After deployment is complete, paste `https://your-app.onrender.com/webhook` into the Line Developers Console.
 
 ---
 
-## 運作流程
+## Workflow
 
 ```
-使用者傳送照片
+User sends an image
        │
        ▼
-  Tesseract OSD 偵測文字方向
+  Tesseract OSD detects text orientation
        │
-  文字是否需要旋轉（90°/180°/270°）？──否──► 回傳：無需旋轉
+  Does the image need rotation (90°/180°/270°)? ──No──► Reply: No rotation needed
        │
-      是
-       │
-       ▼
-  Line 顯示 Loading 動畫
+      Yes
        │
        ▼
-  Pillow 旋轉圖片並暫存於本機伺服器
+  Line displays a Loading animation
        │
        ▼
-  Line 回傳旋轉後照片（附上旋轉角度與本機 URL）
+  Pillow rotates the image and saves it to the local server temporarily
        │
        ▼
-  30秒後自動刪除本機暫存圖片
+  Line replies with the rotated image (includes rotation angle and local URL)
+       │
+       ▼
+  Temporarily cached image is automatically deleted after 30 seconds
 ```
 
 ---
 
-## 常見問題
+## FAQ
 
-**Q: Tesseract 偵測不準怎麼辦？**
-可調整 `app.py` 中的 `confidence < 1.5` 閾值，數字越高越嚴格。
+**Q: What if Tesseract detection is inaccurate?**
+You can adjust the `confidence < 1.5` threshold in `app.py`. A higher number means stricter detection criteria.
 
-**Q: 圖片暫存如何處理？**
-程式會直接在伺服器上產生並保存暫存圖片（透過 `/images/<filename>` 提供給 LINE 讀取），並在 30 秒後自動刪除，無需依賴外部圖床。
+**Q: How is image caching handled?**
+The program directly generates and saves temporary images on the server (served to LINE via `/images/<filename>`), and automatically deletes them after 30 seconds, without relying on external image hosting services.
 
-**Q: 支援中文 OCR 嗎？**
-支援。`render.yaml` 已安裝 `tesseract-ocr-chi-tra`（繁中）和 `tesseract-ocr-chi-sim`（簡中）。
+**Q: Does it support Chinese OCR?**
+Yes. `render.yaml` (through Docker) already installs `tesseract-ocr-chi-tra` (Traditional Chinese) and `tesseract-ocr-chi-sim` (Simplified Chinese).
