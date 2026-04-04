@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: line-photo-bot
+    runtime: python
+    buildCommand: |
+      apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-chi-tra tesseract-ocr-chi-sim
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false          # fill in Render dashboard
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: IMGBB_API_KEY
+        sync: false
