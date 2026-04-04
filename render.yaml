@@ -1,16 +1,8 @@
 services:
   - type: web
     name: line-photo-bot
-    runtime: python
-    buildCommand: |
-      apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-chi-tra tesseract-ocr-chi-sim
-      pip install uv
-      uv venv
-      .venv/bin/uv pip install -r requirements.txt
-    startCommand: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT
+    runtime: docker
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: LINE_CHANNEL_ACCESS_TOKEN
         sync: false          # fill in Render dashboard
       - key: LINE_CHANNEL_SECRET
