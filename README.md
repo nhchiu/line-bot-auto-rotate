@@ -1,6 +1,6 @@
 # Line 照片自動旋轉機器人
 
-收到直式照片時，若文字方向與照片方向不符，自動旋轉後回傳。
+收到照片時，若文字方向與照片方向不符，自動旋轉後回傳。
 
 ---
 
@@ -10,6 +10,7 @@
 line-bot/
 ├── app.py            # 主程式
 ├── requirements.txt  # Python 套件
+├── Dockerfile        # Docker 部署設定
 ├── render.yaml       # Render 部署設定
 └── README.md
 ```
@@ -22,7 +23,6 @@ line-bot/
 | --------------------------- | ------------------- | ----------------------- |
 | `LINE_CHANNEL_ACCESS_TOKEN` | Line Bot Token      | Line Developers Console |
 | `LINE_CHANNEL_SECRET`       | Line Channel Secret | Line Developers Console |
-| `IMGBB_API_KEY`             | 圖片上傳用 API Key  | https://api.imgbb.com/  |
 
 ---
 
@@ -72,7 +72,6 @@ uv pip install -r requirements.txt
 ```bash
 export LINE_CHANNEL_ACCESS_TOKEN="你的Token"
 export LINE_CHANNEL_SECRET="你的Secret"
-export IMGBB_API_KEY="你的imgbb金鑰"
 ```
 
 ### 5. 啟動伺服器
@@ -95,8 +94,8 @@ ngrok http 5000
 
 1. 把這個資料夾推上 GitHub
 2. 在 [Render](https://render.com/) 建立 **New Web Service**，連結 GitHub repo
-3. Render 會自動讀取 `render.yaml`
-4. 在 Render Dashboard → Environment 填入三個環境變數
+3. Render 會自動讀取 `render.yaml` 建立 Docker 容器（自動安裝 Tesseract OCR 等依賴）
+4. 在 Render Dashboard → Environment 填入兩個 LINE 環境變數
 5. 部署完成後，把 `https://your-app.onrender.com/webhook` 填入 Line Developers Console
 
 ---
@@ -107,25 +106,23 @@ ngrok http 5000
 使用者傳送照片
        │
        ▼
-  是直式照片？──否──► 忽略
-       │
-      是
-       │
-       ▼
   Tesseract OSD 偵測文字方向
        │
-  文字是否橫躺（90°/270°）？──否──► 忽略
+  文字是否需要旋轉（90°/180°/270°）？──否──► 回傳：無需旋轉
        │
       是
        │
        ▼
-  Pillow 旋轉圖片
+  Line 顯示 Loading 動畫
        │
        ▼
-  上傳至 imgbb 取得公開 URL
+  Pillow 旋轉圖片並暫存於本機伺服器
        │
        ▼
-  Line reply_message 回傳旋轉後照片
+  Line 回傳旋轉後照片（附上旋轉角度與本機 URL）
+       │
+       ▼
+  30秒後自動刪除本機暫存圖片
 ```
 
 ---
@@ -135,8 +132,8 @@ ngrok http 5000
 **Q: Tesseract 偵測不準怎麼辦？**
 可調整 `app.py` 中的 `confidence < 1.5` 閾值，數字越高越嚴格。
 
-**Q: 可以換掉 imgbb 嗎？**
-可以，把 `upload_image_to_imgbb()` 換成 AWS S3、Google Cloud Storage 或任何能產生公開 URL 的服務。
+**Q: 圖片暫存如何處理？**
+程式會直接在伺服器上產生並保存暫存圖片（透過 `/images/<filename>` 提供給 LINE 讀取），並在 30 秒後自動刪除，無需依賴外部圖床。
 
 **Q: 支援中文 OCR 嗎？**
 支援。`render.yaml` 已安裝 `tesseract-ocr-chi-tra`（繁中）和 `tesseract-ocr-chi-sim`（簡中）。
