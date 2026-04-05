@@ -7,5 +7,3 @@ services:
         sync: false          # fill in Render dashboard
       - key: LINE_CHANNEL_SECRET
         sync: false
-      - key: IMGBB_API_KEY
-        sync: false
