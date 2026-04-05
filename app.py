@@ -59,11 +59,11 @@ def get_dominant_text_angle(img: Image.Image) -> float | None:
     Tesseract cannot determine an orientation confidently.
     """
     try:
-        osd = pytesseract.image_to_osd(img, output_type=Output.DICT)
+        osd = pytesseract.image_to_osd(img, output_type=Output.DICT, config="-c min_characters_to_try=15")
         angle     = osd.get("rotate", 0)          # degrees Tesseract wants to rotate
         confidence= osd.get("orientation_conf", 0)
         logger.info(f"OSD → rotate={angle}°, confidence={confidence:.2f}")
-        if confidence < 1.5:                       # low-confidence → skip
+        if confidence < 1.0:                       # low-confidence → skip
             return None
         return angle
     except pytesseract.TesseractNotFoundError:
